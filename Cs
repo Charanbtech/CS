@@ -1,0 +1,119 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_wine
+from factor_analyzer import FactorAnalyzer
+from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity, calculate_kmo
+
+# Load the Wine dataset
+def load_data():
+    wine = load_wine()
+    df = pd.DataFrame(wine.data, columns=wine.feature_names)
+    print("Dataset shape:", df.shape)
+    print("\nFirst few rows of the dataset:")
+    print(df.head())
+    print("\nDataset description:")
+    print(df.describe())
+    return df
+
+# Check data suitability for factor analysis
+def check_suitability(df):
+    # Bartlett's test
+    chi_square_value, p_value = calculate_bartlett_sphericity(df)
+    print("\nBartlett's test of sphericity:")
+    print(f"Chi-square: {chi_square_value:.2f}")
+    print(f"p-value: {p_value:.5f}")
+
+    # KMO test
+    kmo_all, kmo_model = calculate_kmo(df)
+    print("\nKaiser-Meyer-Olkin (KMO) Test:")
+    print(f"KMO Score: {kmo_model:.3f}")
+
+    # Correlation matrix
+    corr_matrix = df.corr()
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    plt.title('Correlation Matrix Heatmap')
+    plt.tight_layout()
+    plt.savefig('correlation_matrix.png')
+    plt.close()
+
+# Determine the number of factors to extract
+def determine_factors(df):
+    fa = FactorAnalyzer(rotation=None, n_factors=df.shape[1])
+    fa.fit(df)
+    ev, v = fa.get_eigenvalues()
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, df.shape[1] + 1), ev)
+    plt.title('Scree Plot')
+    plt.xlabel('Factors')
+    plt.ylabel('Eigenvalue')
+    plt.axhline(y=1, color='r', linestyle='--')
+    plt.savefig('scree_plot.png')
+    plt.close()
+
+    # Cumulative explained variance
+    cumulative_variance = np.cumsum(v)
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, df.shape[1] + 1), cumulative_variance)
+    plt.title('Cumulative Explained Variance')
+    plt.xlabel('Factors')
+    plt.ylabel('Cumulative Explained Variance')
+    plt.axhline(y=0.8, color='r', linestyle='--')
+    plt.savefig('cumulative_variance.png')
+    plt.close()
+    return ev, v
+
+# Perform factor analysis
+def perform_factor_analysis(df, n_factors):
+    fa = FactorAnalyzer(rotation='varimax', n_factors=n_factors)
+    fa.fit(df)
+    loadings = pd.DataFrame(fa.loadings_, columns=[f'Factor{i+1}' for i in range(n_factors)], index=df.columns)
+    print("\nFactor Loadings:")
+    print(loadings)
+    return fa, loadings
+
+# Visualize the factor loadings
+def visualize_loadings(loadings):
+    plt.figure(figsize=(12, 8))
+    for i in range(loadings.shape[1]):
+        plt.bar(loadings.index, loadings.iloc[:, i], alpha=0.5, label=f'Factor {i+1}')
+    plt.title('Factor Loadings')
+    plt.xlabel('Features')
+    plt.ylabel('Loading Strength')
+    plt.legend()
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.savefig('factor_loadings.png')
+    plt.close()
+
+# Interpret the factors
+def interpret_factors(fa, loadings, n_factors):
+    variance = fa.get_factor_variance()
+    print("\nVariance Explained by Each Factor:")
+    for i in range(n_factors):
+        print(f"Factor {i+1}: {variance[1][i]:.2%}")
+
+    print("\nFactor Interpretation:")
+    for i in range(n_factors):
+        print(f"\nFactor {i+1}:")
+        top_features = loadings.iloc[:, i].abs().sort_values(ascending=False).head(3)
+        for feature, load in top_features.items():
+            print(f" - {feature}: {load:.3
+            print(f" - {feature}: {load:.3f}")
+
+# Main function to run the analysis
+def main():
+    df = load_data()
+    check_suitability(df)
+    ev, v = determine_factors(df)
+    # Choose the number of factors (based on eigenvalues > 1)
+    n_factors = sum(ev > 1)
+    print(f"\nNumber of factors chosen: {n_factors}")
+    fa, loadings = perform_factor_analysis(df, n_factors)
+    visualize_loadings(loadings)
+    interpret_factors(fa, loadings, n_factors)
+
+if __name__ == "__main__":
+    main()
